@@ -1,0 +1,32 @@
+{
+  "name": "my-c-dev-01",
+  "workspaceFolder": "/workspace",
+  "service": "my-c-dev-01",
+  "shutdownAction": "none",
+  "dockerComposeFile": [
+    "./docker-compose.yml"
+  ],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": false,
+        "files.insertFinalNewline": true,
+        "workbench.colorTheme": "Monokai"
+      },
+      "extensions": [
+        "dotenv.dotenv-vscode",
+        "eamodio.gitlens",
+        "EditorConfig.EditorConfig",
+        "esbenp.prettier-vscode",
+        "mads-hartmann.bash-ide-vscode",
+        "mhutchie.git-graph",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.cpptools-extension-pack",
+        "oderwat.indent-rainbow",
+        "timonwong.shellcheck",
+        "trunk.io",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  }
+}
