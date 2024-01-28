@@ -5,46 +5,37 @@
 export COLORED_OUTPUT="${COLORED_OUTPUT:-yes}"
 
 if [ "${COLORED_OUTPUT}" = "yes" ]; then
+  #set -e
   export NC='\e[m' 				  	# No Color
   export Red='\033[0;31m' 		  	# Red
-  export Green="\x1B[32m" 			# Green
+  export Green="\033[0;32m" 			# Green
   export Yellow="\033[0;33m" 		  # Yellow
   export Blue="\033[0;34m" 		    # Blue
   export Cyan="\033[0;36m" 		  	# Cyan
 
   logI() {
-    # shellcheck disable=SC3037
-    echo -e "${Green}[INFO ]${NC} " "$@"
+    printf "${Green}[INFO ]${NC} %s\n" "$@"
   }
   logE() {
-    # shellcheck disable=SC3037
-    echo -e "${Red}[ERROR]${NC} " "$@"
+    printf "${Red}[ERROR] %s${NC}\n" "$@"
   }
-
   logW() {
-    # shellcheck disable=SC3037
-    echo -e "${Cyan}[WARN ]${NC} " "$@"
+    printf "${Cyan}[WARN ] %s${NC}\n" "$@"
   }
-
   logD() {
-    # shellcheck disable=SC3037
-    echo -e "${Yellow}[DEBUG]${NC} " "$@"
+    printf "${Yellow}[DEBUG] %s${NC}\n" "$@"
   }
 else
   logI() {
-    # shellcheck disable=SC3037
-    echo "[INFO ] " "$@"
+    printf "[INFO ] %s\n" "$@"
   }
   logE() {
-    # shellcheck disable=SC3037
-    echo "[ERROR] " "$@"
+    printf "[ERROR] %s\n" "$@"
   }
   logW() {
-    # shellcheck disable=SC3037
-    echo "[WARN ] " "$@"
+    printf "[WARN ] %s\n" "$@"
   }
   logD() {
-    # shellcheck disable=SC3037
-    echo "[DEBUG] " "$@"
+    printf "[DEBUG] %s\n" "$@"
   }
 fi

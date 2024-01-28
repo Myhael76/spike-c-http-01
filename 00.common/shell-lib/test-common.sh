@@ -4,7 +4,7 @@
 
 . ./common.sh
 
-logI "1 - logI should be green"
+logI "1 - logI qualifier only should be green"
 logE "2 - logE should be red"
 logW "3 - logW should be cyan"
 logD "4 - logD should be yellow"
@@ -20,7 +20,7 @@ logD "8 - logD should NOT be yellow"
 export COLORED_OUTPUT="yes"
 . ./common.sh
 
-logI "11 - logI should be green"
+logI "11 - logI qualifier only should be green"
 logE "12 - logE should be red"
 logW "13 - logW should be cyan"
 logD "14 - logD should be yellow"
@@ -28,7 +28,7 @@ logD "14 - logD should be yellow"
 unset COLORED_OUTPUT
 . ./common.sh
 
-logI "21 - logI should be green"
+logI "21 - logI qualifier only should be green"
 logE "22 - logE should be red"
 logW "23 - logW should be cyan"
 logD "24 - logD should be yellow"
