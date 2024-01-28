@@ -1,0 +1,8 @@
+FROM scratch
+
+ARG __file__=gcc-default-server-static.bin
+
+COPY ./cache/${__file__} /server.bin
+
+ENTRYPOINT ["/server.bin"]
+CMD []

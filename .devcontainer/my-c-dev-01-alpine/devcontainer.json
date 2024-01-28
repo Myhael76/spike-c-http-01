@@ -1,7 +1,7 @@
 {
-  "name": "my-c-dev-01",
+  "name": "my-c-dev-01-alpine",
   "workspaceFolder": "/workspace",
-  "service": "my-c-dev-01",
+  "service": "my-c-dev-01-alpine",
   "shutdownAction": "none",
   "dockerComposeFile": [
     "./docker-compose.yml"
@@ -14,17 +14,20 @@
         "workbench.colorTheme": "Monokai"
       },
       "extensions": [
+        "cschlosser.doxdocgen",
         "dotenv.dotenv-vscode",
         "eamodio.gitlens",
         "EditorConfig.EditorConfig",
         "esbenp.prettier-vscode",
+        "github.copilot",
         "mads-hartmann.bash-ide-vscode",
         "mhutchie.git-graph",
         "ms-azuretools.vscode-docker",
         "ms-vscode.cpptools-extension-pack",
         "oderwat.indent-rainbow",
+        "spmeesseman.vscode-taskexplorer",
         "timonwong.shellcheck",
-        "trunk.io",
+        "twxs.cmake",
         "yzhang.markdown-all-in-one"
       ]
     }
