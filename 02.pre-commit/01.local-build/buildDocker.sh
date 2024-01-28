@@ -18,10 +18,15 @@ mkdir -p "${CACHE_DIR}"
 
 staticContainerImageBuild(){
   local imageName="${1}"
-  local binaryName="${2}"
+  local buildDir="${2:-${CACHE_DIR}}"
+  local binaryName="${3}"
 
   logI "Building image ${imageName} with docker using binary file ${binaryName}..."
-  docker build -t "${imageName}-d" -f ./Dockerfile-static .
+  strip --strip-debug "${buildDir}/../${binaryName}"
+  docker build \
+  --build-arg __file__="${binaryName}" \
+  -t "${imageName}-d" \
+  -f "${buildDir}/Dockerfile-static" "${buildDir}"
 
   result2=$?
   if [ $result2 -ne 0 ]; then
@@ -33,4 +38,4 @@ staticContainerImageBuild(){
   docker run --rm "${imageName}-d" || return 4
 }
 
-staticContainerImageBuild my-hello-world-01 "${CACHE_DIR}/server-static.bin"
+staticContainerImageBuild my-hello-world-01 "${CACHE_DIR}/.." "server-static.bin"
