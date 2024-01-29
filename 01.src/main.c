@@ -241,9 +241,7 @@ int main(int argc, char *argv[])
   // printf("Main loop ended\nFreeing events...\n");
   free(events);
   // printf("Closing listening socket...");
-  // int close_result = close(listening_socket_fd);
-  // printf("Result of closing the listening socket is: %d\n", close_result);
-  // sleep(2);
-  // printf("after final sleep...");
+  int close_result = close(listening_socket_fd);
+  if(0 != close_result) printf("Error closing the listening socket: %d\n", close_result);
   return 0;
 }
