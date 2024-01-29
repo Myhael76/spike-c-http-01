@@ -4,5 +4,7 @@ ARG __file__=gcc-default-server-static.bin
 
 COPY ./cache/${__file__} /server.bin
 
+EXPOSE 8080
+
 ENTRYPOINT ["/server.bin"]
 CMD []
