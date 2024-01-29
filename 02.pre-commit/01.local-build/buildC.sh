@@ -16,6 +16,7 @@ SRC_DIR="${WORKSPACE_DIR}/01.src"
 CACHE_DIR="${WORKSPACE_DIR}/02.pre-commit/01.local-build/cache"
 
 mkdir -p "${CACHE_DIR}"
+rm -f "${CACHE_DIR}"/*.bin
 
 buildWithOptions(){
 
@@ -42,8 +43,8 @@ buildWithOptions(){
     return 1
   fi
 
-  logI "Testing the binary file ${binaryName}..."
-  "${binaryName}" || return 2
+  #logI "Testing the binary file ${binaryName}..."
+  #"${binaryName}" || return 2
 
   THIS_FILE_SIZE=$(stat -c %s "${binaryName}")
   logD "${binaryName} size: ${THIS_FILE_SIZE}"

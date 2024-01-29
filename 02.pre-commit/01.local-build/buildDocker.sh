@@ -22,7 +22,7 @@ staticContainerImageBuild(){
   local binaryName="${3}"
 
   logI "Building image ${imageName} with docker using binary file ${binaryName}..."
-  strip --strip-debug "${buildDir}/../${binaryName}"
+  strip --strip-debug "${buildDir}/cache/${binaryName}"
   docker build \
   --build-arg __file__="${binaryName}" \
   -t "${imageName}-d" \
@@ -34,8 +34,8 @@ staticContainerImageBuild(){
     return 3
   fi
 
-  logI "Testing the image ${imageName}-d ..."
-  docker run --rm "${imageName}-d" || return 4
+  #logI "Testing the image ${imageName}-d ..."
+  #docker run --rm "${imageName}-d" || return 4
 }
 
-staticContainerImageBuild my-hello-world-01 "${CACHE_DIR}/.." "server-static.bin"
+staticContainerImageBuild my-http-server "${CACHE_DIR}/.." "gcc-O3-server-static.bin"

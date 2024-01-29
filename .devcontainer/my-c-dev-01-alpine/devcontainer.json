@@ -22,6 +22,7 @@
         "github.copilot",
         "mads-hartmann.bash-ide-vscode",
         "mhutchie.git-graph",
+        "jbenden.c-cpp-flylint",
         "ms-azuretools.vscode-docker",
         "ms-vscode.cpptools-extension-pack",
         "oderwat.indent-rainbow",
