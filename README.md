@@ -50,6 +50,6 @@ The folders are organized to follow the above plan:
 
 - IDE is Visual Studio Code with .devcontainers IaC style environment build
 - We want to build both statically and dynamically
-- We want to build both with musl and glibc
+- We want to build both with `musl` and `glibc`
 - We want to package the resulting binary in minimalistic containers
 - Target Operating System is linux.
