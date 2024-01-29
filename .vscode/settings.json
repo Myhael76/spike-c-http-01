@@ -1,6 +1,10 @@
 {
   "files.associations": {
     ".env*": "dotenv",
-    "epoll.h": "c"
+    "*.env*": "dotenv",
+    "*.wmscript": "properties",
+    "epoll.h": "c",
+    "string.h": "c",
+    "signal.h": "c"
   }
 }

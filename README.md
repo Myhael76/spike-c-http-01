@@ -3,10 +3,15 @@
 Spike feature for a C server used for probes and performance tests on middleware.
 
 - [Spike Feature: Minimal C HTTP Server](#spike-feature-minimal-c-http-server)
+  - [Current status](#current-status)
   - [Organization](#organization)
     - [Plan from a feedback cycles perspective](#plan-from-a-feedback-cycles-perspective)
     - [File System Organization](#file-system-organization)
   - [Decisions](#decisions)
+
+## Current status
+
+ATM the server is responding with a fixed message to any request and doesn't consider the incoming data in any way
 
 ## Organization
 

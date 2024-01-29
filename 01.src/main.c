@@ -1,333 +1,219 @@
-// inspired by https://github.com/JeffreytheCoder/Simple-HTTP-Server
+/*
+ ** epoll-web-server.c 
+ ** 
+ ** Single Thread multiuser web Server
+ ** epoll-web-server [port]
+ ** see https://github.com/Menghongli/C-Web-Server/blob/master/epoll-server.c
+ **
+ */
+#include<errno.h>
+#include<fcntl.h>
+#include<netdb.h>
+#include<signal.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<sys/epoll.h>
+#include<sys/sendfile.h>
+#include<sys/socket.h>
+#include<sys/stat.h>
+#include<sys/types.h>
+#include<unistd.h>
 
-#include <arpa/inet.h>
-#include <ctype.h>
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <pthread.h>
-#include <regex.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#define MAXEPOLLSIZE          1000
+#define BACKLOG               200          // how many pending connections queue will hold
+#define RECV_BUFFER_SIZE      10240        // Receiving buffer size
+#define HELLO_RESPONSE        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"message\":\"hello\"}\0"
 
+// Manage interruptions
 static volatile int keepRunning = 1;
-
-void intHandler(int dummy) {
+static void interruptHandler(int dummy) {
   printf("Interrupted, exiting...\n");
   keepRunning = 0;
 }
 
+int process_request(const struct epoll_event * e){
+  printf("Processing request ...\n");
 
-#define PORT 8080
-#define BUFFER_SIZE 104857600
-#define MAX_CON 10
-#define MAX_EVENTS 10
+  // TODO: generalize and add the performance use cases. for now probe only
 
-void log_immediate(const char *message)
-{
-  printf("%s\n", message);
-  fflush(stdout);
-}
-
-const char *get_file_extension(const char *file_name)
-{
-  const char *dot = strrchr(file_name, '.');
-  if (!dot || dot == file_name)
-  {
-    return "";
-  }
-  return dot + 1;
-}
-
-const char *get_mime_type(const char *file_ext)
-{
-  if (strcasecmp(file_ext, "html") == 0 || strcasecmp(file_ext, "htm") == 0)
-  {
-    return "text/html";
-  }
-  else if (strcasecmp(file_ext, "txt") == 0)
-  {
-    return "text/plain";
-  }
-  else if (strcasecmp(file_ext, "jpg") == 0 || strcasecmp(file_ext, "jpeg") == 0)
-  {
-    return "image/jpeg";
-  }
-  else if (strcasecmp(file_ext, "png") == 0)
-  {
-    return "image/png";
-  }
-  else
-  {
-    return "application/octet-stream";
-  }
-}
-
-bool case_insensitive_compare(const char *s1, const char *s2)
-{
-  while (*s1 && *s2)
-  {
-    if (tolower((unsigned char)*s1) != tolower((unsigned char)*s2))
-    {
-      return false;
-    }
-    s1++;
-    s2++;
-  }
-  return *s1 == *s2;
-}
-
-char *get_file_case_insensitive(const char *file_name)
-{
-  DIR *dir = opendir(".");
-  if (dir == NULL)
-  {
-    perror("opendir");
-    return NULL;
-  }
-
-  struct dirent *entry;
-  char *found_file_name = NULL;
-  while ((entry = readdir(dir)) != NULL)
-  {
-    if (case_insensitive_compare(entry->d_name, file_name))
-    {
-      found_file_name = entry->d_name;
-      break;
-    }
-  }
-
-  closedir(dir);
-  return found_file_name;
-}
-
-char *url_decode(const char *src)
-{
-  size_t src_len = strlen(src);
-  char *decoded = malloc(src_len + 1);
-  size_t decoded_len = 0;
-
-  // decode %2x to hex
-  for (size_t i = 0; i < src_len; i++)
-  {
-    if (src[i] == '%' && i + 2 < src_len)
-    {
-      int hex_val;
-      sscanf(src + i + 1, "%2x", &hex_val);
-      decoded[decoded_len++] = hex_val;
-      i += 2;
-    }
-    else
-    {
-      decoded[decoded_len++] = src[i];
-    }
-  }
-
-  // add null terminator
-  decoded[decoded_len] = '\0';
-  return decoded;
-}
-
-void build_http_response(const char *file_name,
-                         const char *file_ext,
-                         char *response,
-                         size_t *response_len)
-{
-  // build HTTP header
-  const char *mime_type = get_mime_type(file_ext);
-  char *header = (char *)malloc(BUFFER_SIZE * sizeof(char));
-  snprintf(header, BUFFER_SIZE,
-           "HTTP/1.1 200 OK\r\n"
-           "Content-Type: %s\r\n"
-           "\r\n",
-           mime_type);
-
-  // if file not exist, response is 404 Not Found
-  int file_fd = open(file_name, O_RDONLY);
-  if (file_fd == -1)
-  {
-    snprintf(response, BUFFER_SIZE,
-             "HTTP/1.1 404 Not Found\r\n"
-             "Content-Type: text/plain\r\n"
-             "\r\n"
-             "404 Not Found");
-    *response_len = strlen(response);
-    return;
-  }
-
-  // get file size for Content-Length
-  struct stat file_stat;
-  fstat(file_fd, &file_stat);
-  off_t file_size = file_stat.st_size;
-
-  // copy header to response buffer
-  *response_len = 0;
-  memcpy(response, header, strlen(header));
-  *response_len += strlen(header);
-
-  // copy file to response buffer
-  ssize_t bytes_read;
-  while ((bytes_read = read(file_fd,
-                            response + *response_len,
-                            BUFFER_SIZE - *response_len)) > 0)
-  {
-    *response_len += bytes_read;
-  }
-  free(header);
-  close(file_fd);
-}
-
-void *handle_client(void *arg)
-{
-  log_immediate("handle_client - 1");
-  int client_fd = *((int *)arg);
-
-  char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
-
-  log_immediate("Client connected\n");
-  // receive request data from client and store into buffer
-  ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
+  /*
+  bytes_received = recv(e->data.fd, recv_buffer, RECV_BUFFER_SIZE, 0);
   printf("Received %ld bytes\n", bytes_received);
-  printf("Request:\n%s\n", buffer);
-  log_immediate("2");
-  if (bytes_received > 0)
+  printf("Request:\n%s\n", recv_buffer);
+  */
+  printf("Sending %s \n\n", HELLO_RESPONSE);
+  if (-1 == send(e->data.fd, HELLO_RESPONSE, strlen(HELLO_RESPONSE),0))
   {
-    // check if request is GET
-    regex_t regex;
-    regcomp(&regex, "^GET /([^ ]*) HTTP/1", REG_EXTENDED);
-    regmatch_t matches[2];
-
-    if (regexec(&regex, buffer, 2, matches, 0) == 0)
-    {
-      // extract filename from request and decode URL
-      buffer[matches[1].rm_eo] = '\0';
-      const char *url_encoded_file_name = buffer + matches[1].rm_so;
-      char *file_name = url_decode(url_encoded_file_name);
-
-      // get file extension
-      char file_ext[32];
-      strcpy(file_ext, get_file_extension(file_name));
-
-      // build HTTP response
-      char *response = (char *)malloc(BUFFER_SIZE * 2 * sizeof(char));
-      size_t response_len;
-      build_http_response(file_name, file_ext, response, &response_len);
-
-      // send HTTP response to client
-      send(client_fd, response, response_len, 0);
-
-      free(response);
-      free(file_name);
-    }
-    regfree(&regex);
+    perror("send");
+    printf("Error sending...\n");
+    return -1;
   }
-  close(client_fd);
-  free(arg);
-  free(buffer);
-  return NULL;
+  return 0;
+}
+
+int set_non_blocking(int listening_socket_fd)
+{
+  int flags, s;
+  flags = fcntl(listening_socket_fd, F_GETFL, 0);
+  if(flags == -1)
+  {
+    perror("fcntl");
+    return -1;
+  }
+  flags |= O_NONBLOCK;
+  s = fcntl(listening_socket_fd, F_SETFL, flags);
+  if(s == -1)
+  {
+    perror("fcntl");
+    return -1;
+  }
+  return 0;
 }
 
 int main(int argc, char *argv[])
 {
-  signal(SIGINT, intHandler);
-  signal(SIGTERM, intHandler);
-  int server_fd = 0;
-  int counter = 0;
-  struct sockaddr_in server_addr;
-  struct epoll_event event;
-  struct epoll_event events[MAX_EVENTS];
 
-  // create server socket
-  if ((server_fd = socket(AF_INET, SOCK_STREAM|SOCK_NONBLOCK, 0)) < 0)
-  {
-    perror("socket failed");
-    exit(EXIT_FAILURE);
+  signal(SIGINT, interruptHandler);
+  signal(SIGTERM, interruptHandler);
+
+  int status;
+  int listening_socket_fd, new_fd, kdpfd, nfds, n, curfds;
+  struct addrinfo hints;
+  struct addrinfo *servinfo;         // will point to the results 
+  struct addrinfo *p;
+  struct sockaddr_storage client_addr;
+  struct epoll_event ev;
+  struct epoll_event *events;
+  socklen_t addr_size;
+
+  char * recv_buffer = (char *)malloc(RECV_BUFFER_SIZE * sizeof(char));
+
+  static char * port_no = NULL;
+
+  // optionally receive port on first argument, default 8080
+  if (argc < 2) {
+    port_no = "8080";
+  }else{
+    port_no = argv[1];
   }
 
-  // config socket
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(PORT);
+  memset(&hints, 0, sizeof hints);  // make sure the struct is empty
+  hints.ai_family = AF_UNSPEC;       // don't care IPv4 or IPv6
+  hints.ai_socktype = SOCK_STREAM;   // TCP stream sockets
+  hints.ai_flags = AI_PASSIVE;      // fill in my IP for me
 
-  // bind socket to port
-  setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
-  if (bind(server_fd,
-           (struct sockaddr *)&server_addr,
-           sizeof(server_addr)) < 0)
-  {
-    perror("bind failed");
-    exit(EXIT_FAILURE);
+  //if((status = getaddrinfo(NULL, argv[1], &hints, &servinfo)) != 0 ) {
+  if((status = getaddrinfo(NULL, port_no , &hints, &servinfo)) != 0 ) {
+    fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+    return 2;
+  }
+  // servinfo now points to a linked list of 1 or more struct addrinfos
+  printf("Inspecting sockets variants..");
+  uint8_t variantsNo=0;
+  for (p = servinfo; p != NULL; p = p->ai_next, variantsNo++ ) {
+    printf("p[%d]->(socket type: %d; ai_family: %d; ai_family: %d ai_protocol;) ", variantsNo, p->ai_socktype, p->ai_family, p->ai_protocol);
+
+    // make a socket:
+    if ((listening_socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+      perror("server: socket");
+      continue;
+    }
+
+    // make the sock non blocking
+    set_non_blocking(listening_socket_fd);
+
+    // bind it to the port
+    if ((bind(listening_socket_fd, p->ai_addr, p->ai_addrlen)) == -1) {
+      close(listening_socket_fd);
+      perror("server: bind");
+      continue;
+    }
+
+    break;
   }
 
-  //setnonblocking(server_fd);
-  // listen for connections
-  if (listen(server_fd, MAX_CON) < 0)
-  {
-    perror("listen failed");
-    exit(EXIT_FAILURE);
+  if(p == NULL) {
+    fprintf(stderr, "server: failed to bind\n");
+    return 2;
   }
 
-  int epfd = epoll_create(1);
-  //epoll_ctl_add(epfd, server_fd, EPOLLIN | EPOLLOUT | EPOLLET);
-  event.data.fd = server_fd;
-  event.events = EPOLLIN | EPOLLET;
-  int s = epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &event);
-  if(s == -1)
-  {
-      perror("epoll_ctl");
-      exit(EXIT_FAILURE);
+  freeaddrinfo(servinfo); // free the linked-list
+
+  // listen for incoming connection
+  if (listen(listening_socket_fd, BACKLOG) == -1) {
+    perror("listen");
+    exit(1);
   }
-	struct sockaddr_in cli_addr;
-  socklen_t cli_addr_len = sizeof(cli_addr);
 
-  printf("Server listening on port %d\n", PORT);
-  bool justAccepted = false;
-  while (keepRunning)
+  printf("server: waiting for connections...\n");
+
+  kdpfd = epoll_create(MAXEPOLLSIZE);
+  ev.events = EPOLLIN|EPOLLET;
+  ev.data.fd = listening_socket_fd;
+  if(epoll_ctl(kdpfd, EPOLL_CTL_ADD, listening_socket_fd, &ev) < 0)
   {
-    log_immediate("in outer while...");
-    int nfds = epoll_wait(epfd, events, MAX_EVENTS, 2000);
-    printf("epoll_wait received %d events", nfds);
+    fprintf(stderr, "epoll set insert error.");
+    return -1;
+  } else {
+    printf("success insert listening socket into epoll.\n");
+  }
+  events = calloc (MAXEPOLLSIZE, sizeof ev);
+  curfds = 1;
+  while(keepRunning) 
+  { //loop for accept incoming connection
 
-    for (int i = 0; keepRunning && (i < nfds); i++){
-      log_immediate("in inner for...");
-      if (events[i].data.fd == server_fd){
-        log_immediate("in inner if...");
-
-        // client info
-        struct sockaddr_in client_addr;
-        socklen_t client_addr_len = sizeof(client_addr);
-        int *client_fd = malloc(sizeof(int));
-
-        // accept client connection
-        if ((*client_fd = accept(server_fd,
-                                (struct sockaddr *)&client_addr,
-                                &client_addr_len)) < 0)
+    printf("== BEGIN == loop for accept incoming connection\n");
+    nfds = epoll_wait(kdpfd, events, curfds, 5000);
+    if(nfds == -1)
+    {
+      perror("epoll_wait");
+      break;
+    }    
+    for (n = 0; keepRunning && (n < nfds); ++n)
+    {
+      if(events[n].data.fd == listening_socket_fd){
+        addr_size = sizeof client_addr;
+        new_fd = accept(events[n].data.fd, (struct sockaddr *)&client_addr, &addr_size);
+        if (new_fd == -1)
         {
-          perror("accept failed");
-          continue;
+          if((errno == EAGAIN) ||
+             (errno == EWOULDBLOCK))
+          {
+            break;
+          }
+          else
+          {
+            perror("accept");
+            break;
+          }
         }
-        log_immediate("accepted");
-        // create a new thread to handle client request
-        pthread_t thread_id;
-        pthread_create(&thread_id, NULL, handle_client, (void *)client_fd);
-        pthread_detach(thread_id);
-      }
-      else{
-        log_immediate("in inner else...");
-        printf("event fd: %d\n", events[i].data.fd);
+        printf("server: connection established...\n");
+        set_non_blocking(new_fd);
+        ev.events = EPOLLIN|EPOLLET;
+        ev.data.fd = new_fd;
+        if(epoll_ctl(kdpfd,EPOLL_CTL_ADD, new_fd, &ev)<0)
+        {
+          printf("Failed to insert socket into epoll.\n");
+        }
+        curfds++;
+      } else {
+        process_request(&events[n]);
+
+        // if(send(events[n].data.fd, "Hello, world!", 13, 0) == -1)
+        // {
+        //   perror("send");
+        //   break;
+        // }
+        epoll_ctl(kdpfd, EPOLL_CTL_DEL, events[n].data.fd, &ev);
+        curfds--;
+        close(events[n].data.fd);
       }
     }
+    printf("==  END  == loop for accept incoming connection\n");
+  
   }
-
-  close(server_fd);
+  free(events);
+  close(listening_socket_fd);      
   return 0;
 }
